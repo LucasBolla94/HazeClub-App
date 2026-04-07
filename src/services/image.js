@@ -2,7 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from './supabase';
 
-const SUPABASE_URL = 'http://51.75.119.144:8000';
+const SUPABASE_URL = 'https://db.hazeclub.online';
 
 const IMAGE_CONFIG = {
   post: {

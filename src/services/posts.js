@@ -126,4 +126,46 @@ export async function deleteComment(commentId) {
   if (error) throw error;
 }
 
-// Image upload moved to services/image.js
+export async function toggleCommentLike(commentId, userId) {
+  const { data: existing } = await supabase
+    .from('comment_likes')
+    .select('id')
+    .eq('comment_id', commentId)
+    .eq('user_id', userId)
+    .single();
+
+  if (existing) {
+    await supabase.from('comment_likes').delete().eq('id', existing.id);
+    return false;
+  } else {
+    await supabase.from('comment_likes').insert({ comment_id: commentId, user_id: userId });
+    return true;
+  }
+}
+
+export async function checkCommentLikes(commentIds, userId) {
+  if (!commentIds.length) return {};
+  const { data } = await supabase
+    .from('comment_likes')
+    .select('comment_id')
+    .eq('user_id', userId)
+    .in('comment_id', commentIds);
+
+  const map = {};
+  (data || []).forEach(l => { map[l.comment_id] = true; });
+  return map;
+}
+
+export async function getCommentLikeCounts(commentIds) {
+  if (!commentIds.length) return {};
+  const { data } = await supabase
+    .from('comment_likes')
+    .select('comment_id')
+    .in('comment_id', commentIds);
+
+  const counts = {};
+  (data || []).forEach(l => {
+    counts[l.comment_id] = (counts[l.comment_id] || 0) + 1;
+  });
+  return counts;
+}

@@ -72,8 +72,8 @@ export default function PostCard({ post, liked, onLikeToggle, onCommentPress, on
       <TouchableOpacity style={styles.userRow} onPress={onProfilePress} activeOpacity={0.7}>
         <Avatar url={profile?.avatar_url} name={profile?.display_name} size={42} />
         <View style={styles.userInfo}>
-          <Text style={styles.displayName}>{profile?.display_name}</Text>
-          <Text style={styles.username}>@{profile?.username} · {dayjs(post.created_at).fromNow()}</Text>
+          <Text style={styles.displayName}>@{profile?.username}</Text>
+          <Text style={styles.username}>{dayjs(post.created_at).fromNow()}</Text>
         </View>
       </TouchableOpacity>
 

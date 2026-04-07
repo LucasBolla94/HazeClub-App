@@ -1,42 +1,63 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
-  Image, KeyboardAvoidingView, Platform, ScrollView,
-  ActivityIndicator, Keyboard, Animated,
+  Image, Platform, Animated, Keyboard,
+  ActivityIndicator, InputAccessoryView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import Toast from 'react-native-toast-message';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/ui/Avatar';
 import { createPost } from '../../services/posts';
-import * as ImagePicker from 'expo-image-picker';
 import { pickImage, uploadImage } from '../../services/image';
+
+const INPUT_ACCESSORY_ID = 'create-post-toolbar';
+const MAX_CHARS = 500;
 
 export default function CreatePostScreen({ navigation }) {
   const { user, profile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [content, setContent] = useState('');
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const inputRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 300,
+      duration: 250,
       useNativeDriver: true,
     }).start();
-    // Auto-focus after modal animation
     const timer = setTimeout(() => inputRef.current?.focus(), 400);
-    return () => clearTimeout(timer);
+
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setKeyboardVisible(true),
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false),
+    );
+
+    return () => {
+      clearTimeout(timer);
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
   const hasContent = content.trim().length > 0 || image;
+  const charsLeft = MAX_CHARS - content.length;
 
-  async function handlePickImage() {
+  async function handlePickGallery() {
     Keyboard.dismiss();
     try {
       const uri = await pickImage({ allowsEditing: true });
@@ -49,16 +70,29 @@ export default function CreatePostScreen({ navigation }) {
     }
   }
 
-  function handleClose() {
-    if (hasContent) {
-      // Simple confirm - could use Alert.alert for native feel
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  async function handlePickCamera() {
+    Keyboard.dismiss();
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Toast.show({ type: 'error', text1: 'Permissao da camera negada' });
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 1,
+        allowsEditing: true,
+      });
+      if (!result.canceled) {
+        setImage(result.assets[0].uri);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (err) {
+      Toast.show({ type: 'error', text1: err.message });
     }
-    navigation.goBack();
   }
 
   async function handlePost() {
-    if (!hasContent) return;
+    if (!hasContent || loading) return;
     setLoading(true);
     Keyboard.dismiss();
     try {
@@ -80,137 +114,139 @@ export default function CreatePostScreen({ navigation }) {
     }
   }
 
-  return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={12}>
-          <Ionicons name="close" size={26} color={colors.text.primary} />
-        </TouchableOpacity>
+  // Toolbar component — used both inline (Android) and as InputAccessoryView (iOS)
+  function Toolbar() {
+    return (
+      <View style={styles.toolbar}>
+        <View style={styles.toolbarActions}>
+          <TouchableOpacity
+            onPress={handlePickGallery}
+            style={styles.toolBtn}
+            activeOpacity={0.6}
+            disabled={loading}
+          >
+            <Ionicons name="image-outline" size={22} color={colors.accent} />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.postBtn, !hasContent && styles.postBtnDisabled]}
-          onPress={handlePost}
-          disabled={loading || !hasContent}
-          activeOpacity={0.7}
-        >
-          {loading ? (
-            <View style={styles.postBtnLoading}>
-              <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.postBtnLoadingText}>
-                {uploadProgress || 'Postando...'}
-              </Text>
-            </View>
-          ) : (
-            <Text style={styles.postBtnText}>Publicar</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            onPress={handlePickCamera}
+            style={styles.toolBtn}
+            activeOpacity={0.6}
+            disabled={loading}
+          >
+            <Ionicons name="camera-outline" size={22} color={colors.accent} />
+          </TouchableOpacity>
 
-      {/* Drag indicator (modal feel) */}
-      <View style={styles.dragIndicator} />
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex}
-        keyboardVerticalOffset={0}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Compose area */}
-          <View style={styles.compose}>
-            <Avatar url={profile?.avatar_url} name={profile?.display_name} size={40} />
-            <View style={styles.composeRight}>
-              <Text style={styles.composeName}>{profile?.display_name}</Text>
-              <TextInput
-                ref={inputRef}
-                style={styles.input}
-                placeholder="No que voce esta pensando?"
-                placeholderTextColor={colors.text.muted}
-                value={content}
-                onChangeText={setContent}
-                multiline
-                maxLength={500}
-                scrollEnabled={false}
-              />
-            </View>
-          </View>
-
-          {/* Image Preview */}
-          {image && (
-            <View style={styles.imagePreview}>
-              <Image source={{ uri: image }} style={styles.previewImg} resizeMode="cover" />
-              <TouchableOpacity
-                style={styles.removeImgBtn}
-                onPress={() => {
-                  setImage(null);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.removeImgCircle}>
-                  <Ionicons name="close" size={18} color="#fff" />
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Bottom Toolbar */}
-        <View style={styles.toolbar}>
-          <View style={styles.toolbarLeft}>
-            <TouchableOpacity
-              onPress={handlePickImage}
-              style={styles.toolBtn}
-              activeOpacity={0.6}
-              disabled={loading}
-            >
-              <Ionicons name="image" size={22} color={colors.accent} />
-              <Text style={styles.toolLabel}>Foto</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={async () => {
-                Keyboard.dismiss();
-                try {
-                  const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                  if (status !== 'granted') {
-                    Toast.show({ type: 'error', text1: 'Permissao da camera negada' });
-                    return;
-                  }
-                  const result = await ImagePicker.launchCameraAsync({
-                    quality: 1,
-                    allowsEditing: true,
-                  });
-                  if (!result.canceled) {
-                    setImage(result.assets[0].uri);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }
-                } catch (err) {
-                  Toast.show({ type: 'error', text1: err.message });
-                }
-              }}
-              style={styles.toolBtn}
-              activeOpacity={0.6}
-              disabled={loading}
-            >
-              <Ionicons name="camera" size={22} color={colors.accent} />
-              <Text style={styles.toolLabel}>Camera</Text>
-            </TouchableOpacity>
-          </View>
+          <View style={styles.toolSep} />
 
           <Text style={[
             styles.charCount,
-            content.length > 450 && styles.charCountWarn,
-            content.length >= 500 && styles.charCountMax,
+            charsLeft <= 50 && charsLeft > 0 && styles.charCountWarn,
+            charsLeft <= 0 && styles.charCountMax,
           ]}>
-            {content.length}/500
+            {charsLeft}
           </Text>
         </View>
-      </KeyboardAvoidingView>
+
+        <TouchableOpacity
+          onPress={handlePost}
+          disabled={loading || !hasContent}
+          activeOpacity={0.8}
+        >
+          {loading ? (
+            <View style={styles.postPill}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.postPillText}>{uploadProgress || 'Postando...'}</Text>
+            </View>
+          ) : (
+            <LinearGradient
+              colors={hasContent ? ['#9d84fd', '#7c5cfc'] : ['#2a2a40', '#2a2a40']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.postPill}
+            >
+              <Ionicons name="send" size={16} color={hasContent ? '#fff' : colors.text.muted} />
+              <Text style={[styles.postPillText, !hasContent && { color: colors.text.muted }]}>
+                Publicar
+              </Text>
+            </LinearGradient>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <Animated.View style={[styles.container, { opacity: fadeAnim, paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.closeBtn}
+          hitSlop={12}
+        >
+          <Ionicons name="chevron-down" size={26} color={colors.text.primary} />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>Novo Post</Text>
+
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Compose */}
+      <View style={styles.compose}>
+        <Avatar url={profile?.avatar_url} name={profile?.display_name} size={42} />
+        <View style={styles.composeBody}>
+          <Text style={styles.composeName}>@{profile?.username}</Text>
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            placeholder="No que voce esta pensando?"
+            placeholderTextColor={colors.text.muted}
+            value={content}
+            onChangeText={setContent}
+            multiline
+            maxLength={MAX_CHARS}
+            scrollEnabled
+            inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+          />
+        </View>
+      </View>
+
+      {/* Image Preview */}
+      {image && (
+        <View style={styles.imageWrap}>
+          <Image source={{ uri: image }} style={styles.previewImg} resizeMode="cover" />
+          <TouchableOpacity
+            style={styles.removeImg}
+            onPress={() => {
+              setImage(null);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+          >
+            <View style={styles.removeImgCircle}>
+              <Ionicons name="close" size={16} color="#fff" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Spacer to push toolbar down */}
+      <View style={styles.flex} />
+
+      {/* iOS: toolbar sticks above keyboard via InputAccessoryView */}
+      {Platform.OS === 'ios' && (
+        <InputAccessoryView nativeID={INPUT_ACCESSORY_ID}>
+          <Toolbar />
+        </InputAccessoryView>
+      )}
+
+      {/* Show toolbar at bottom when keyboard is hidden (iOS) or always (Android) */}
+      {(Platform.OS === 'android' || !keyboardVisible) && (
+        <View style={{ paddingBottom: Platform.OS === 'ios' ? insets.bottom : spacing.sm }}>
+          <Toolbar />
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -225,9 +261,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 58,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  headerTitle: {
+    color: colors.text.primary,
+    fontSize: 17,
+    fontWeight: '700',
   },
   closeBtn: {
     width: 40,
@@ -237,76 +277,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dragIndicator: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    alignSelf: 'center',
-    marginBottom: spacing.md,
-  },
-  postBtn: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    borderRadius: borderRadius.full,
-    minWidth: 90,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  postBtnDisabled: { opacity: 0.35 },
-  postBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  postBtnLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  postBtnLoadingText: { color: '#fff', fontSize: 13, fontWeight: '500' },
-  scrollContent: {
-    padding: spacing.lg,
-    paddingTop: spacing.sm,
-    flexGrow: 1,
-  },
   compose: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    gap: 12,
   },
-  composeRight: { flex: 1 },
+  composeBody: { flex: 1 },
   composeName: {
     color: colors.text.primary,
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
+  },
+  composeUsername: {
+    color: colors.text.muted,
+    fontWeight: '400',
+    fontSize: 13,
   },
   input: {
     color: colors.text.primary,
     fontSize: 17,
     lineHeight: 24,
     textAlignVertical: 'top',
-    minHeight: 80,
-    paddingTop: 0,
+    minHeight: 100,
+    maxHeight: 200,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
-  imagePreview: {
-    marginTop: spacing.lg,
+  imageWrap: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
-    position: 'relative',
   },
   previewImg: {
     width: '100%',
-    height: 280,
+    height: 220,
     backgroundColor: colors.bg.card,
+    borderRadius: borderRadius.lg,
   },
-  removeImgBtn: {
+  removeImg: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 8,
+    right: 8,
   },
   removeImgCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -315,32 +334,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    paddingBottom: Platform.OS === 'ios' ? 34 : spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    paddingVertical: 10,
     backgroundColor: colors.bg.secondary,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.border,
   },
-  toolbarLeft: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-  },
-  toolBtn: {
+  toolbarActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: spacing.xs,
+    gap: 4,
   },
-  toolLabel: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '500',
+  toolBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.bg.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toolSep: {
+    width: 1,
+    height: 20,
+    backgroundColor: colors.border,
+    marginHorizontal: 8,
   },
   charCount: {
     color: colors.text.muted,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
+    minWidth: 30,
+    textAlign: 'center',
   },
   charCountWarn: { color: '#fccc5c' },
   charCountMax: { color: colors.error },
+  postPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: borderRadius.full,
+  },
+  postPillText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

@@ -13,7 +13,7 @@ import Toast from 'react-native-toast-message';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/ui/Avatar';
-import { getComments, addComment, toggleLike, checkUserLikes } from '../../services/posts';
+import { getComments, addComment, toggleLike, checkUserLikes, toggleCommentLike, checkCommentLikes, getCommentLikeCounts } from '../../services/posts';
 import { supabase } from '../../services/supabase';
 
 dayjs.extend(relativeTime);
@@ -51,6 +51,8 @@ export default function PostDetailScreen({ route, navigation }) {
   const [sending, setSending] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [commentLikeMap, setCommentLikeMap] = useState({});
+  const [commentLikeCounts, setCommentLikeCounts] = useState({});
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -80,6 +82,14 @@ export default function PostDetailScreen({ route, navigation }) {
 
       setComments(commentsData);
       setLiked(!!likeMap[postId]);
+
+      const commentIds = commentsData.map(c => c.id);
+      const [cLikes, cCounts] = await Promise.all([
+        checkCommentLikes(commentIds, user.id),
+        getCommentLikeCounts(commentIds),
+      ]);
+      setCommentLikeMap(cLikes);
+      setCommentLikeCounts(cCounts);
     } catch (err) {
       console.error(err);
       Toast.show({ type: 'error', text1: 'Erro ao carregar post' });
@@ -93,6 +103,16 @@ export default function PostDetailScreen({ route, navigation }) {
     const newLiked = await toggleLike(postId, user.id);
     setLiked(newLiked);
     setLikesCount(prev => newLiked ? prev + 1 : prev - 1);
+  }
+
+  async function handleCommentLike(commentId) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newLiked = await toggleCommentLike(commentId, user.id);
+    setCommentLikeMap(prev => ({ ...prev, [commentId]: newLiked }));
+    setCommentLikeCounts(prev => ({
+      ...prev,
+      [commentId]: (prev[commentId] || 0) + (newLiked ? 1 : -1),
+    }));
   }
 
   async function handleSendComment() {
@@ -167,8 +187,7 @@ export default function PostDetailScreen({ route, navigation }) {
             >
               <Avatar url={postProfile?.avatar_url} name={postProfile?.display_name} size={48} />
               <View style={styles.authorInfo}>
-                <Text style={styles.authorName}>{postProfile?.display_name}</Text>
-                <Text style={styles.authorUsername}>@{postProfile?.username}</Text>
+                <Text style={styles.authorName}>@{postProfile?.username}</Text>
               </View>
               <Text style={styles.timeAgo}>{dayjs(post.created_at).fromNow()}</Text>
             </TouchableOpacity>
@@ -235,19 +254,41 @@ export default function PostDetailScreen({ route, navigation }) {
             )}
           </View>
         )}
-        renderItem={({ item }) => (
-          <View style={styles.comment}>
-            <Avatar url={item.profiles?.avatar_url} name={item.profiles?.display_name} size={36} />
-            <View style={styles.commentBubble}>
-              <View style={styles.commentTop}>
-                <Text style={styles.commentAuthor}>{item.profiles?.display_name}</Text>
-                <Text style={styles.commentUsername}>@{item.profiles?.username}</Text>
+        renderItem={({ item }) => {
+          const cLiked = !!commentLikeMap[item.id];
+          const cCount = commentLikeCounts[item.id] || 0;
+          return (
+            <View style={styles.comment}>
+              <Avatar url={item.profiles?.avatar_url} name={item.profiles?.display_name} size={36} />
+              <View style={styles.commentBubble}>
+                <View style={styles.commentTop}>
+                  <Text style={styles.commentAuthor}>@{item.profiles?.username}</Text>
+                </View>
+                <Text style={styles.commentText}>{item.content}</Text>
+                <View style={styles.commentFooter}>
+                  <Text style={styles.commentTime}>{dayjs(item.created_at).fromNow()}</Text>
+                  <TouchableOpacity
+                    style={styles.commentLikeBtn}
+                    onPress={() => handleCommentLike(item.id)}
+                    activeOpacity={0.6}
+                    hitSlop={8}
+                  >
+                    <Ionicons
+                      name={cLiked ? 'heart' : 'heart-outline'}
+                      size={14}
+                      color={cLiked ? colors.like : colors.text.muted}
+                    />
+                    {cCount > 0 && (
+                      <Text style={[styles.commentLikeCount, cLiked && { color: colors.like }]}>
+                        {cCount}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
-              <Text style={styles.commentText}>{item.content}</Text>
-              <Text style={styles.commentTime}>{dayjs(item.created_at).fromNow()}</Text>
             </View>
-          </View>
-        )}
+          );
+        }}
         ListEmptyComponent={
           <View style={styles.emptyComments}>
             <Ionicons name="chatbubbles-outline" size={36} color={colors.text.muted} />
@@ -430,7 +471,25 @@ const styles = StyleSheet.create({
   commentAuthor: { color: colors.text.primary, fontSize: 14, fontWeight: '600' },
   commentUsername: { color: colors.text.muted, fontSize: 12 },
   commentText: { color: colors.text.primary, fontSize: 14, lineHeight: 20 },
-  commentTime: { color: colors.text.muted, fontSize: 11, marginTop: 4 },
+  commentFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  commentTime: { color: colors.text.muted, fontSize: 11 },
+  commentLikeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  commentLikeCount: {
+    color: colors.text.muted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
 
   emptyComments: {
     alignItems: 'center',

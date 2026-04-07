@@ -1,10 +1,11 @@
-import React from 'react';
-import { TouchableOpacity, View, StyleSheet } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { TouchableOpacity, View, StyleSheet, Animated, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../theme';
+import { colors, spacing } from '../theme';
 
 import FeedScreen from '../screens/feed/FeedScreen';
 import SearchScreen from '../screens/search/SearchScreen';
@@ -49,24 +50,83 @@ function ProfileStack() {
   );
 }
 
+// Animated tab icon with active indicator
+function TabIcon({ name, focused, color }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const dotOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: focused ? 1.15 : 1,
+        friction: 5,
+        tension: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(dotOpacity, {
+        toValue: focused ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [focused]);
+
+  return (
+    <View style={styles.tabIconWrap}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Ionicons name={focused ? name : `${name}-outline`} size={24} color={color} />
+      </Animated.View>
+      <Animated.View style={[styles.activeDot, { opacity: dotOpacity }]} />
+    </View>
+  );
+}
+
+// Floating create button with gradient
 function CreateButton({ onPress }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  function handlePressIn() {
+    Animated.spring(scale, {
+      toValue: 0.88,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+  }
+
+  function handlePressOut() {
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 3,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
+  }
+
   return (
     <TouchableOpacity
       style={styles.createBtn}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
       }}
-      activeOpacity={0.8}
+      activeOpacity={1}
     >
-      <View style={styles.createBtnInner}>
-        <Ionicons name="add" size={28} color="#fff" />
-      </View>
+      <Animated.View style={[styles.createBtnShadow, { transform: [{ scale }] }]}>
+        <LinearGradient
+          colors={['#9d84fd', '#7c5cfc', '#5c8cfc']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.createBtnGradient}
+        >
+          <Ionicons name="add" size={30} color="#fff" />
+        </LinearGradient>
+      </Animated.View>
     </TouchableOpacity>
   );
 }
 
-// Placeholder for the Create tab (never actually rendered)
 function EmptyScreen() {
   return <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />;
 }
@@ -80,15 +140,26 @@ function MainTabs() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.text.muted,
         tabBarShowLabel: false,
-        tabBarIcon: ({ color }) => {
+        tabBarIcon: ({ focused, color }) => {
           const icons = {
             Feed: 'home',
             Search: 'search',
-            CreateTab: 'add',
+            CreateTab: 'add-circle',
             Profile: 'person',
           };
-          return <Ionicons name={icons[route.name]} size={24} color={color} />;
+          return <TabIcon name={icons[route.name]} focused={focused} color={color} />;
         },
+        tabBarBackground: () => (
+          <View style={styles.tabBarBg}>
+            <LinearGradient
+              colors={['rgba(18,18,26,0.97)', 'rgba(10,10,15,0.99)']}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+            />
+            <View style={styles.tabBarTopLine} />
+          </View>
+        ),
       })}
     >
       <Tab.Screen name="Feed" component={FeedStack} />
@@ -104,10 +175,9 @@ function MainTabs() {
           },
         })}
         options={{
+          tabBarIcon: () => null,
           tabBarButton: (props) => (
-            <CreateButton
-              onPress={() => props.onPress?.()}
-            />
+            <CreateButton onPress={() => props.onPress?.()} />
           ),
         }}
       />
@@ -133,31 +203,59 @@ export default function AppStack() {
   );
 }
 
+const BOTTOM_INSET = Platform.OS === 'ios' ? 28 : 12;
+
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.bg.secondary,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    height: 85,
-    paddingBottom: 25,
-    paddingTop: 10,
+    position: 'absolute',
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+    elevation: 0,
+    height: 64 + BOTTOM_INSET,
+    paddingBottom: BOTTOM_INSET,
+    paddingTop: 8,
+  },
+  tabBarBg: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  tabBarTopLine: {
+    position: 'absolute',
+    top: 0,
+    left: spacing.xl,
+    right: spacing.xl,
+    height: 0.5,
+    backgroundColor: 'rgba(124,92,252,0.2)',
+  },
+  tabIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 36,
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.accent,
+    marginTop: 4,
   },
   createBtn: {
-    top: -15,
+    top: -20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  createBtnInner: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.accent,
+  createBtnShadow: {
+    shadowColor: '#7c5cfc',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 12,
+  },
+  createBtnGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
   },
 });

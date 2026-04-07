@@ -65,8 +65,7 @@ export default function SearchScreen({ navigation }) {
             >
               <Avatar url={item.avatar_url} name={item.display_name} size={44} />
               <View style={styles.userInfo}>
-                <Text style={styles.displayName}>{item.display_name}</Text>
-                <Text style={styles.username}>@{item.username}</Text>
+                <Text style={styles.displayName}>@{item.username}</Text>
               </View>
             </TouchableOpacity>
           )}

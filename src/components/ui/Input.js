@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef } from 'react';
 import { View, TextInput, Text, StyleSheet } from 'react-native';
 import { colors, borderRadius, spacing } from '../../theme';
 
-export function Input({ label, error, style, ...props }) {
+export const Input = forwardRef(function Input({ label, error, style, ...props }, ref) {
   const [focused, setFocused] = useState(false);
 
   return (
     <View style={[styles.container, style]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <TextInput
+        ref={ref}
         style={[
           styles.input,
           focused && styles.inputFocused,
@@ -22,7 +23,7 @@ export function Input({ label, error, style, ...props }) {
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { marginBottom: spacing.md },

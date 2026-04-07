@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-const SUPABASE_URL = 'http://51.75.119.144:8000';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjQxNzY5MjAwLCJleHAiOjE3OTk1MzU2MDB9.2zU9BqydvWuWtuyNrANPZ3kt7eOizIGkvSgSUcrAZgw';
+const SUPABASE_URL = 'https://db.hazeclub.online';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc1NTk5NzI3LCJleHAiOjE5MzMyNzk3Mjd9.VGMbuMvmkQ4RjnA81crGtYkcisefQxI4x6OrvhdvIMA';
 
 const ExpoSecureStoreAdapter = {
   getItem: (key) => SecureStore.getItemAsync(key),

@@ -102,8 +102,7 @@ export default function ProfileScreen({ navigation, route }) {
                   name={viewProfile?.display_name}
                   size={80}
                 />
-                <Text style={styles.displayName}>{viewProfile?.display_name}</Text>
-                <Text style={styles.username}>@{viewProfile?.username}</Text>
+                <Text style={styles.displayName}>@{viewProfile?.username}</Text>
                 {viewProfile?.bio ? (
                   <Text style={styles.bio}>{viewProfile.bio}</Text>
                 ) : null}
