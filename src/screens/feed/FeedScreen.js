@@ -117,7 +117,7 @@ export default function FeedScreen({ navigation }) {
             <Text style={styles.emptySubtext}>Seja o primeiro a postar!</Text>
           </View>
         }
-        contentContainerStyle={posts.length === 0 && styles.emptyContainer}
+        contentContainerStyle={[{ paddingBottom: 100 }, posts.length === 0 && styles.emptyContainer]}
       />
     </View>
   );

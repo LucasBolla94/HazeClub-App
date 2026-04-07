@@ -116,6 +116,7 @@ export default function ProfileScreen({ navigation, route }) {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
         ListHeaderComponent={() => (
           <View>
             {/* Cover Photo */}
@@ -476,6 +477,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
+  listContent: { paddingBottom: 100 },
   empty: { padding: spacing.xxl, alignItems: 'center', gap: spacing.sm },
   emptyText: { color: colors.text.muted, fontSize: 15 },
 });
