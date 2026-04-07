@@ -15,6 +15,11 @@ const IMAGE_CONFIG = {
     quality: 0.8,
     bucket: 'avatars',
   },
+  cover: {
+    maxWidth: 1200,
+    quality: 0.85,
+    bucket: 'covers',
+  },
 };
 
 /**
@@ -85,16 +90,21 @@ export async function uploadImage(uri, userId, type = 'post') {
   const arrayBuffer = await readFileAsArrayBuffer(processedUri);
 
   // 3. Unique filename
-  const fileName = type === 'avatar'
-    ? `${userId}/avatar.jpg`
-    : `${userId}/${Date.now()}.jpg`;
+  let fileName;
+  if (type === 'avatar') {
+    fileName = `${userId}/avatar.jpg`;
+  } else if (type === 'cover') {
+    fileName = `${userId}/cover.jpg`;
+  } else {
+    fileName = `${userId}/${Date.now()}.jpg`;
+  }
 
   // 4. Upload
   const { data, error } = await supabase.storage
     .from(config.bucket)
     .upload(fileName, arrayBuffer, {
       contentType: 'image/jpeg',
-      upsert: type === 'avatar',
+      upsert: type === 'avatar' || type === 'cover',
       cacheControl: '3600',
     });
 

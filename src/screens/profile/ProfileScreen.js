@@ -1,15 +1,20 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Image, Dimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/ui/Avatar';
 import { getUserPosts, checkUserLikes } from '../../services/posts';
 import PostCard from '../../components/feed/PostCard';
+
+const SCREEN_W = Dimensions.get('window').width;
+const COVER_H = 180;
+const AVATAR_SIZE = 86;
 
 export default function ProfileScreen({ navigation, route }) {
   const { user, profile: myProfile, signOut } = useAuth();
@@ -87,49 +92,114 @@ export default function ProfileScreen({ navigation, route }) {
         keyExtractor={(item) => item.id}
         ListHeaderComponent={() => (
           <View>
-            <View style={styles.header}>
+            {/* Cover Photo */}
+            <View style={styles.coverWrap}>
+              {viewProfile?.cover_url ? (
+                <Image
+                  source={{ uri: viewProfile.cover_url }}
+                  style={styles.coverImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <LinearGradient
+                  colors={['#1a1a2e', '#12121a', '#0a0a0f']}
+                  style={styles.coverImage}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+              )}
+              {/* Dark overlay for readability */}
+              <LinearGradient
+                colors={['transparent', 'rgba(10,10,15,0.8)']}
+                style={styles.coverOverlay}
+                start={{ x: 0.5, y: 0.2 }}
+                end={{ x: 0.5, y: 1 }}
+              />
+
+              {/* Back button */}
               {!isMe && (
                 <TouchableOpacity
                   style={styles.backBtn}
                   onPress={() => navigation.goBack()}
                 >
-                  <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+                  <Ionicons name="chevron-back" size={22} color="#fff" />
                 </TouchableOpacity>
               )}
-              <View style={styles.profileInfo}>
+
+              {/* Edit cover (only own profile) */}
+              {isMe && (
+                <TouchableOpacity
+                  style={styles.editCoverBtn}
+                  onPress={() => navigation.navigate('EditProfile')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="camera-outline" size={16} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Avatar overlapping cover */}
+            <View style={styles.avatarSection}>
+              <View style={styles.avatarBorder}>
                 <Avatar
                   url={viewProfile?.avatar_url}
                   name={viewProfile?.display_name}
-                  size={80}
+                  size={AVATAR_SIZE}
                 />
-                <Text style={styles.displayName}>@{viewProfile?.username}</Text>
-                {viewProfile?.bio ? (
-                  <Text style={styles.bio}>{viewProfile.bio}</Text>
-                ) : null}
-
-                <View style={styles.statsRow}>
-                  <View style={styles.stat}>
-                    <Text style={styles.statNum}>{stats.posts}</Text>
-                    <Text style={styles.statLabel}>Posts</Text>
-                  </View>
-                </View>
-
-                {isMe && (
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={styles.editBtn}
-                      onPress={() => navigation.navigate('EditProfile')}
-                    >
-                      <Text style={styles.editBtnText}>Editar Perfil</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.logoutBtn} onPress={signOut}>
-                      <Ionicons name="log-out-outline" size={20} color={colors.error} />
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
             </View>
-            <View style={styles.divider} />
+
+            {/* Profile Info */}
+            <View style={styles.profileInfo}>
+              <Text style={styles.username}>@{viewProfile?.username}</Text>
+
+              {/* Status text / frase */}
+              {viewProfile?.status_text ? (
+                <View style={styles.statusWrap}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.accent} />
+                  <Text style={styles.statusText}>{viewProfile.status_text}</Text>
+                </View>
+              ) : null}
+
+              {viewProfile?.bio ? (
+                <Text style={styles.bio}>{viewProfile.bio}</Text>
+              ) : null}
+
+              {/* Stats */}
+              <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                  <Text style={styles.statNum}>{stats.posts}</Text>
+                  <Text style={styles.statLabel}>Posts</Text>
+                </View>
+              </View>
+
+              {/* Actions */}
+              {isMe && (
+                <View style={styles.actionRow}>
+                  <TouchableOpacity
+                    style={styles.editBtn}
+                    onPress={() => navigation.navigate('EditProfile')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="pencil-outline" size={16} color={colors.text.primary} />
+                    <Text style={styles.editBtnText}>Editar Perfil</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.logoutBtn}
+                    onPress={signOut}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="log-out-outline" size={18} color={colors.error} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Posts divider */}
+            <View style={styles.postsDivider}>
+              <Ionicons name="grid-outline" size={16} color={colors.text.muted} />
+              <Text style={styles.postsDividerText}>Posts</Text>
+            </View>
           </View>
         )}
         renderItem={({ item }) => (
@@ -153,7 +223,8 @@ export default function ProfileScreen({ navigation, route }) {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>Nenhum post</Text>
+            <Ionicons name="document-text-outline" size={40} color={colors.text.muted} />
+            <Text style={styles.emptyText}>Nenhum post ainda</Text>
           </View>
         }
       />
@@ -164,18 +235,87 @@ export default function ProfileScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg.primary },
-  header: {
-    paddingTop: 60,
-    paddingBottom: spacing.lg,
-    backgroundColor: colors.bg.secondary,
+
+  // Cover
+  coverWrap: {
+    width: SCREEN_W,
+    height: COVER_H,
+    position: 'relative',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
   backBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    position: 'absolute',
+    top: 52,
+    left: spacing.md,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  profileInfo: { alignItems: 'center', paddingHorizontal: spacing.lg },
-  displayName: { ...typography.h2, color: colors.text.primary, marginTop: spacing.md },
-  username: { color: colors.text.muted, fontSize: 15, marginTop: 2 },
+  editCoverBtn: {
+    position: 'absolute',
+    top: 52,
+    right: spacing.md,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Avatar
+  avatarSection: {
+    alignItems: 'center',
+    marginTop: -(AVATAR_SIZE / 2),
+    zIndex: 10,
+  },
+  avatarBorder: {
+    borderRadius: (AVATAR_SIZE + 6) / 2,
+    borderWidth: 3,
+    borderColor: colors.bg.primary,
+    backgroundColor: colors.bg.primary,
+  },
+
+  // Info
+  profileInfo: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.bg.primary,
+  },
+  username: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.text.primary,
+    letterSpacing: 0.5,
+  },
+  statusWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    backgroundColor: colors.bg.card,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+    maxWidth: '90%',
+  },
+  statusText: {
+    color: colors.text.secondary,
+    fontSize: 13,
+    fontStyle: 'italic',
+    flexShrink: 1,
+  },
   bio: {
     color: colors.text.secondary,
     fontSize: 14,
@@ -199,6 +339,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.full,
@@ -212,7 +355,27 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     padding: spacing.sm,
   },
-  divider: { height: 1, backgroundColor: colors.border },
-  empty: { padding: spacing.xxl, alignItems: 'center' },
+
+  // Posts divider
+  postsDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bg.secondary,
+  },
+  postsDividerText: {
+    color: colors.text.muted,
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+
+  empty: { padding: spacing.xxl, alignItems: 'center', gap: spacing.sm },
   emptyText: { color: colors.text.muted, fontSize: 15 },
 });
