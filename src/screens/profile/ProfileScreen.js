@@ -10,6 +10,7 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/ui/Avatar';
 import { getUserPosts, checkUserLikes } from '../../services/posts';
+import { isFollowing, toggleFollow, getFollowCounts } from '../../services/follows';
 import PostCard from '../../components/feed/PostCard';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -26,7 +27,9 @@ export default function ProfileScreen({ navigation, route }) {
   const [likeMap, setLikeMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState({ posts: 0 });
+  const [stats, setStats] = useState({ posts: 0, followers: 0, following: 0 });
+  const [following, setFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   async function loadProfile() {
     try {
@@ -48,7 +51,14 @@ export default function ProfileScreen({ navigation, route }) {
 
       setPosts(postsData);
       setLikeMap(likes);
-      setStats({ posts: count });
+
+      const followCounts = await getFollowCounts(viewUserId);
+      setStats({ posts: count, followers: followCounts.followers, following: followCounts.following });
+
+      if (!isMe) {
+        const amFollowing = await isFollowing(user.id, viewUserId);
+        setFollowing(amFollowing);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -62,6 +72,22 @@ export default function ProfileScreen({ navigation, route }) {
       loadProfile();
     }, [viewUserId, myProfile])
   );
+
+  async function handleFollow() {
+    setFollowLoading(true);
+    try {
+      const nowFollowing = await toggleFollow(user.id, viewUserId);
+      setFollowing(nowFollowing);
+      setStats(prev => ({
+        ...prev,
+        followers: prev.followers + (nowFollowing ? 1 : -1),
+      }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFollowLoading(false);
+    }
+  }
 
   function handleLikeToggle(postId, liked) {
     setLikeMap(prev => ({ ...prev, [postId]: liked }));
@@ -171,10 +197,34 @@ export default function ProfileScreen({ navigation, route }) {
                   <Text style={styles.statNum}>{stats.posts}</Text>
                   <Text style={styles.statLabel}>Posts</Text>
                 </View>
+                <TouchableOpacity
+                  style={styles.stat}
+                  onPress={() => navigation.navigate('FollowList', {
+                    userId: viewUserId,
+                    tab: 'followers',
+                    username: viewProfile?.username,
+                  })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.statNum}>{stats.followers}</Text>
+                  <Text style={styles.statLabel}>Seguidores</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.stat}
+                  onPress={() => navigation.navigate('FollowList', {
+                    userId: viewUserId,
+                    tab: 'following',
+                    username: viewProfile?.username,
+                  })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.statNum}>{stats.following}</Text>
+                  <Text style={styles.statLabel}>Seguindo</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Actions */}
-              {isMe && (
+              {isMe ? (
                 <View style={styles.actionRow}>
                   <TouchableOpacity
                     style={styles.editBtn}
@@ -190,6 +240,30 @@ export default function ProfileScreen({ navigation, route }) {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="log-out-outline" size={18} color={colors.error} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.actionRow}>
+                  <TouchableOpacity
+                    style={[styles.followMainBtn, following && styles.followMainBtnActive]}
+                    onPress={handleFollow}
+                    disabled={followLoading}
+                    activeOpacity={0.7}
+                  >
+                    {followLoading ? (
+                      <ActivityIndicator size="small" color={following ? colors.text.secondary : '#fff'} />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name={following ? 'checkmark' : 'person-add-outline'}
+                          size={16}
+                          color={following ? colors.text.secondary : '#fff'}
+                        />
+                        <Text style={[styles.followMainBtnText, following && styles.followMainBtnTextActive]}>
+                          {following ? 'Seguindo' : 'Seguir'}
+                        </Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 </View>
               )}
@@ -354,6 +428,32 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: borderRadius.full,
     padding: spacing.sm,
+  },
+
+  // Follow button (other user)
+  followMainBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: borderRadius.full,
+    minWidth: 120,
+    justifyContent: 'center',
+  },
+  followMainBtnActive: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  followMainBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  followMainBtnTextActive: {
+    color: colors.text.secondary,
   },
 
   // Posts divider

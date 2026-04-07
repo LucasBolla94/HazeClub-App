@@ -13,6 +13,7 @@ import CreatePostScreen from '../screens/post/CreatePostScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import PostDetailScreen from '../screens/post/PostDetailScreen';
+import FollowListScreen from '../screens/profile/FollowListScreen';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator();
@@ -26,6 +27,7 @@ function FeedStack() {
       <FeedNav.Screen name="FeedHome" component={FeedScreen} />
       <FeedNav.Screen name="PostDetail" component={PostDetailScreen} />
       <FeedNav.Screen name="UserProfile" component={ProfileScreen} />
+      <FeedNav.Screen name="FollowList" component={FollowListScreen} />
     </FeedNav.Navigator>
   );
 }
@@ -36,6 +38,7 @@ function SearchStack() {
       <SearchNav.Screen name="SearchHome" component={SearchScreen} />
       <SearchNav.Screen name="UserProfile" component={ProfileScreen} />
       <SearchNav.Screen name="PostDetail" component={PostDetailScreen} />
+      <SearchNav.Screen name="FollowList" component={FollowListScreen} />
     </SearchNav.Navigator>
   );
 }
@@ -46,6 +49,7 @@ function ProfileStack() {
       <ProfileNav.Screen name="ProfileHome" component={ProfileScreen} />
       <ProfileNav.Screen name="EditProfile" component={EditProfileScreen} />
       <ProfileNav.Screen name="PostDetail" component={PostDetailScreen} />
+      <ProfileNav.Screen name="FollowList" component={FollowListScreen} />
     </ProfileNav.Navigator>
   );
 }
