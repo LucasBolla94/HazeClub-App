@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, StyleSheet,
   TouchableOpacity, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Image, Dimensions,
+  ActivityIndicator, Image, Dimensions, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -13,7 +13,7 @@ import Toast from 'react-native-toast-message';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/ui/Avatar';
-import { getComments, addComment, toggleLike, checkUserLikes, toggleCommentLike, checkCommentLikes, getCommentLikeCounts } from '../../services/posts';
+import { getComments, addComment, deleteComment, toggleLike, checkUserLikes, toggleCommentLike, checkCommentLikes, getCommentLikeCounts, deletePost, togglePostPrivacy } from '../../services/posts';
 import { supabase } from '../../services/supabase';
 
 dayjs.extend(relativeTime);
@@ -115,6 +115,54 @@ export default function PostDetailScreen({ route, navigation }) {
     }));
   }
 
+  function handleDeleteComment(commentId) {
+    Alert.alert('Apagar comentario', 'Tem certeza?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Apagar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteComment(commentId);
+            setComments(prev => prev.filter(c => c.id !== commentId));
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch (err) {
+            Alert.alert('Erro', 'Nao foi possivel apagar o comentario');
+          }
+        },
+      },
+    ]);
+  }
+
+  function handleDeletePost() {
+    Alert.alert('Apagar post', 'Tem certeza? Essa acao nao pode ser desfeita.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Apagar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deletePost(postId);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            navigation.goBack();
+          } catch (err) {
+            Alert.alert('Erro', 'Nao foi possivel apagar o post');
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleTogglePrivacy() {
+    try {
+      const newPrivate = await togglePostPrivacy(postId);
+      setPost(prev => ({ ...prev, is_private: newPrivate }));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      Alert.alert('Erro', 'Nao foi possivel alterar a privacidade');
+    }
+  }
+
   async function handleSendComment() {
     const text = newComment.trim();
     if (!text) return;
@@ -170,7 +218,27 @@ export default function PostDetailScreen({ route, navigation }) {
           <Ionicons name="chevron-back" size={26} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post</Text>
-        <View style={styles.headerRight} />
+        {post && user?.id === post.user_id ? (
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Alert.alert('Opcoes do post', '', [
+                {
+                  text: post.is_private ? 'Tornar publico' : 'Tornar privado',
+                  onPress: handleTogglePrivacy,
+                },
+                { text: 'Apagar post', style: 'destructive', onPress: handleDeletePost },
+                { text: 'Cancelar', style: 'cancel' },
+              ]);
+            }}
+            style={styles.backBtn}
+            hitSlop={8}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.text.primary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerRight} />
+        )}
       </View>
 
       <FlatList
@@ -267,23 +335,34 @@ export default function PostDetailScreen({ route, navigation }) {
                 <Text style={styles.commentText}>{item.content}</Text>
                 <View style={styles.commentFooter}>
                   <Text style={styles.commentTime}>{dayjs(item.created_at).fromNow()}</Text>
-                  <TouchableOpacity
-                    style={styles.commentLikeBtn}
-                    onPress={() => handleCommentLike(item.id)}
-                    activeOpacity={0.6}
-                    hitSlop={8}
-                  >
-                    <Ionicons
-                      name={cLiked ? 'heart' : 'heart-outline'}
-                      size={14}
-                      color={cLiked ? colors.like : colors.text.muted}
-                    />
-                    {cCount > 0 && (
-                      <Text style={[styles.commentLikeCount, cLiked && { color: colors.like }]}>
-                        {cCount}
-                      </Text>
+                  <View style={styles.commentActions}>
+                    {(item.user_id === user.id || post?.user_id === user.id) && (
+                      <TouchableOpacity
+                        onPress={() => handleDeleteComment(item.id)}
+                        activeOpacity={0.6}
+                        hitSlop={8}
+                      >
+                        <Ionicons name="trash-outline" size={13} color={colors.text.muted} />
+                      </TouchableOpacity>
                     )}
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.commentLikeBtn}
+                      onPress={() => handleCommentLike(item.id)}
+                      activeOpacity={0.6}
+                      hitSlop={8}
+                    >
+                      <Ionicons
+                        name={cLiked ? 'heart' : 'heart-outline'}
+                        size={14}
+                        color={cLiked ? colors.like : colors.text.muted}
+                      />
+                      {cCount > 0 && (
+                        <Text style={[styles.commentLikeCount, cLiked && { color: colors.like }]}>
+                          {cCount}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             </View>
@@ -478,6 +557,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   commentTime: { color: colors.text.muted, fontSize: 11 },
+  commentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   commentLikeBtn: {
     flexDirection: 'row',
     alignItems: 'center',

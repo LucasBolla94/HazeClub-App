@@ -63,6 +63,22 @@ export async function deletePost(postId) {
   if (error) throw error;
 }
 
+export async function togglePostPrivacy(postId) {
+  const { data: post } = await supabase
+    .from('posts')
+    .select('is_private')
+    .eq('id', postId)
+    .single();
+
+  const newValue = !post?.is_private;
+  const { error } = await supabase
+    .from('posts')
+    .update({ is_private: newValue })
+    .eq('id', postId);
+  if (error) throw error;
+  return newValue;
+}
+
 export async function toggleLike(postId, userId) {
   const { data: existing } = await supabase
     .from('likes')

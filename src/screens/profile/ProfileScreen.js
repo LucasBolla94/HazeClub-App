@@ -284,6 +284,7 @@ export default function ProfileScreen({ navigation, route }) {
             onLikeToggle={handleLikeToggle}
             onCommentPress={() => navigation.navigate('PostDetail', { postId: item.id })}
             onProfilePress={() => {}}
+            onDeleted={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
           />
         )}
         refreshControl={

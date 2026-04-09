@@ -98,6 +98,7 @@ export default function FeedScreen({ navigation }) {
             onLikeToggle={handleLikeToggle}
             onCommentPress={() => navigation.navigate('PostDetail', { postId: item.id })}
             onProfilePress={() => navigation.navigate('UserProfile', { userId: item.user_id })}
+            onDeleted={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
           />
         )}
         refreshControl={
